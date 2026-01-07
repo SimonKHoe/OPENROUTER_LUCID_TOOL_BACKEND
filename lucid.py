@@ -392,7 +392,7 @@ def lucid():
                     print("[INFO /lucid] Successfully processed OpenAI response.") # Vercel Log
                     try:
                         # Parse the JSON response from OpenAI
-                        resp_json = response_openai.json()
+                        resp_json = response_llm.json()
                         # Extract the generated text content safely
                         generated_text = resp_json['choices'][0]['message']['content']
 
@@ -417,7 +417,7 @@ def lucid():
                     # Try to extract a cleaner error message from OpenAI's response JSON
                     error_details = openai_response_text
                     try:
-                       error_json = response_openai.json()
+                       error_json = response_llm.json()
                        if 'error' in error_json and 'message' in error_json['error']:
                            error_details = error_json['error']['message']
                     except json.JSONDecodeError:

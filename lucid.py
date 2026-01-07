@@ -279,7 +279,7 @@ def lucid():
             status_code = 500
         else:
             # --- Step 3: Extract parameters from frontend ---
-            model = body.get('model', 'gpt-4o')
+            model = body.get('model', 'gpt-oss-120b:free')
             messages = body.get('messages', [])
             temp_from_frontend = body.get('temperature')
             seed_from_frontend = body.get('seed')
@@ -314,7 +314,6 @@ def lucid():
                 headers = {
                     'Content-Type': 'application/json',
                     'Authorization': f'Bearer {openrouter_api_key}',
-                    'HTTP-Referer': 'https://yourinstitution.edu',
                     'X-Title': 'LUCID Qualtrics Study'
                 }
                 data_payload = {

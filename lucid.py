@@ -212,100 +212,65 @@ def lucid():
     Main API endpoint (/lucid).
     Receives chat messages and configuration from Qualtrics frontend via POST request.
     Validates request origin using CORS settings.
-    Calls the OpenAI Chat Completions API.
+    Calls the OpenRouter Chat Completions API.
     Returns the AI's response or an error message in JSON format.
-    Includes necessary CORS headers on the response, including 'Access-Control-Allow-Credentials'
-    only when appropriate and with the value 'true'.
+    Includes necessary CORS headers on the response.
     """
     # --- Step 1: CORS Check for POST request ---
     origin = request.headers.get('Origin')
     allowed_origins = get_allowed_origins_config()
-    # ---------------- DEBUG LOGGING ----------------
+
     print(f"[DEBUG /lucid] OPENROUTER_API_KEY length: {len(os.getenv('OPENROUTER_API_KEY') or '')}")
-    # ------------------------------------------------
-    print(f"[DEBUG POST /lucid] Request Origin: '{origin}' vs Allowed: {allowed_origins}") # Vercel Log
 
-    origin_to_send = None # Header value for Access-Control-Allow-Origin
-    # 'allow_credentials_post' will determine if the 'Access-Control-Allow-Credentials' header is sent
-    allow_credentials_post = False # Default to false, set true only for specific allowed origins
-    is_request_allowed = False # Flag to track if request passes CORS check
+    origin_to_send = None
+    allow_credentials_post = False
+    is_request_allowed = False
 
-    # Determine if the request origin is permitted
     if '*' in allowed_origins:
         origin_to_send = '*'
         is_request_allowed = True
-        allow_credentials_post = False # Cannot use credentials with wildcard
-        print("[DEBUG POST /lucid] Policy: Allowed Wildcard (*), Credentials False") # Vercel Log
+        allow_credentials_post = False
+        print("[DEBUG POST /lucid] Policy: Allowed Wildcard (*), Credentials False")
     elif origin and origin in allowed_origins:
         origin_to_send = origin
         is_request_allowed = True
-        allow_credentials_post = True # Allow credentials for specific origins
-        print(f"[DEBUG POST /lucid] Policy: Allowed Specific Origin ({origin}), Credentials True") # Vercel Log
+        allow_credentials_post = True
+        print(f"[DEBUG POST /lucid] Policy: Allowed Specific Origin ({origin}), Credentials True")
     else:
-        # Origin is not in the allowed list (and not wildcard)
         is_request_allowed = False
-        print(f"[DEBUG POST /lucid] Policy: Denied Origin ({origin})") # Vercel Log
+        print(f"[DEBUG POST /lucid] Policy: Denied Origin ({origin})")
 
-    # If CORS check fails, return 403 Forbidden immediately
     if not is_request_allowed:
-        print(f"[WARN] POST to /lucid denied for origin: {origin}.") # Vercel Log
+        print(f"[WARN] POST to /lucid denied for origin: {origin}.")
         error_resp = make_response(jsonify({'error': 'Forbidden', 'message': 'Origin not permitted.'}), 403)
-        # Add CORS headers even on error where possible, though browser might ignore on 403
         if origin_to_send:
-             error_resp.headers['Access-Control-Allow-Origin'] = origin_to_send
-             error_resp.headers['Vary'] = 'Origin'
-             # Only add credentials header if needed and true
-             if allow_credentials_post:
-                 error_resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            error_resp.headers['Access-Control-Allow-Origin'] = origin_to_send
+            error_resp.headers['Vary'] = 'Origin'
+            if allow_credentials_post:
+                error_resp.headers['Access-Control-Allow-Credentials'] = 'true'
         return error_resp
-    # --- End CORS Check ---
 
-    # --- Step 2: Process Request Body ---
-    print(f"[INFO] ------ Entered lucid function from allowed origin: {origin} ------") # Vercel Log
-    post_data = request.data # Get raw request body
-    print(f"[INFO /lucid] Received {len(post_data)} bytes.") # Vercel Log
+    print(f"[INFO] ------ Entered lucid function from allowed origin: {origin} ------")
+    post_data = request.data
+    print(f"[INFO /lucid] Received {len(post_data)} bytes.")
 
-    response_data = {} # Dictionary to hold the JSON response data
-    status_code = 500  # Default to Internal Server Error
+    response_data = {}
+    status_code = 500
 
     try:
-        # Decode body as UTF-8 and parse JSON
         body = json.loads(post_data.decode('utf-8'))
 
-        # --- Step 3: Get and Check for API Key ---
-        # UPDATED: Check for both uppercase and lowercase env var names
-        # EDIT: Changed from the openai api key to openrouter
-        # openai_api_key = (
-            # os.getenv('OPENAI_API_KEY') or  # Vercel / production (Screaming Snake Case)
-            # os.getenv('openai_api_key')     # legacy/local (lower snake case)
-        # )
+        # --- Step 2: Get API Key ---
         openrouter_api_key = (
             os.getenv('OPENROUTER_API_KEY') or
             os.getenv('openrouter_api_key')
         )
 
-        # Basic check/log for the API key (without exposing the key itself)
-        # if isinstance(openrouter_api_key, str) and len(openrouter_api_key) > 7:
-            # print(f"[DIAGNOSTIC /lucid] API Key Found (Length: {len(openai_api_key)}).") # Vercel Log
-        # elif not openai_api_key:
-            # print("[CRITICAL DIAGNOSTIC /lucid] Neither os.getenv('OPENAI_API_KEY') nor os.getenv('openai_api_key') returned a value!") # Vercel Log
-                      
-        # EDITED: Changed the openai api key to openrouter instead
-            if isinstance(openrouter_api_key, str) and len(openrouter_api_key) > 7:
-                print(f"[DIAGNOSTIC /lucid] OpenRouter API Key Found (Length: {len(openrouter_api_key)}).")
-            elif not openrouter_api_key:
-                print("[CRITICAL /lucid] OPENROUTER_API_KEY not found in environment variables.") # Vercel log
+        if isinstance(openrouter_api_key, str) and len(openrouter_api_key) > 7:
+            print(f"[DIAGNOSTIC /lucid] OpenRouter API Key Found (Length: {len(openrouter_api_key)}).")
+        else:
+            print("[CRITICAL /lucid] OPENROUTER_API_KEY not found in environment variables.")
 
-            
-                      
-        # --- Check if API Key is actually present ---
-        
-            # if not openai_api_key:
-            # print('[CRITICAL /lucid] OpenAI API key not found in environment variables (checked OPENAI_API_KEY and openai_api_key).') # Vercel Log
-            # Set error response if key is missing
-            # response_data = {'error': 'Configuration Error', 'message':'OpenAI API key not configured on server.'}
-            # status_code = 500 # Indicate server configuration error
-        # EDITED: openrouter instead of openai    
         if not openrouter_api_key:
             response_data = {
                 'error': 'Configuration Error',
@@ -313,166 +278,118 @@ def lucid():
             }
             status_code = 500
         else:
-            # API Key found, proceed to extract data and call OpenAI
+            # --- Step 3: Extract parameters from frontend ---
+            model = body.get('model', 'gpt-4o')
+            messages = body.get('messages', [])
+            temp_from_frontend = body.get('temperature')
+            seed_from_frontend = body.get('seed')
 
-            # Extract parameters sent from Qualtrics frontend
-            model = body.get('model', 'gpt-4o') # Use model from request, default to gpt-4o if not sent (JS usually sends its default)
-            messages = body.get('messages', []) # Get message history array
-            temp_from_frontend = body.get('temperature') # Get optional temperature
-            seed_from_frontend = body.get('seed') # Get optional seed
-
-            # Validate messages list (must not be empty)
-            if not messages or not (messages, list):
-                print("[WARN /lucid] Invalid or empty 'messages' list received.") # Vercel Log
+            if not messages or not isinstance(messages, list):
+                print("[WARN /lucid] Invalid or empty 'messages' list received.")
                 response_data = {'error': 'Bad Request', 'message': 'Messages list is missing, empty, or invalid.'}
-                status_code = 400 # Bad Request
+                status_code = 400
             else:
-                # Process temperature (use value from frontend if valid, otherwise default to 1.0)
-                used_temperature = 1.0 # Default temperature
+                used_temperature = 1.0
                 if temp_from_frontend is not None:
                     try:
                         parsed_temp = float(temp_from_frontend)
-                        if 0.0 <= parsed_temp <= 2.0: used_temperature = parsed_temp
-                        else: print(f"[WARN /lucid] Temp '{parsed_temp}' out of range, using default.") # Vercel Log
-                    except (ValueError, TypeError): print(f"[WARN /lucid] Invalid temp format ('{temp_from_frontend}'), using default.") # Vercel Log
-                print(f"[INFO /lucid] Using temperature: {used_temperature}") # Vercel Log
+                        if 0.0 <= parsed_temp <= 2.0:
+                            used_temperature = parsed_temp
+                        else:
+                            print(f"[WARN /lucid] Temp '{parsed_temp}' out of range, using default.")
+                    except (ValueError, TypeError):
+                        print(f"[WARN /lucid] Invalid temp format ('{temp_from_frontend}'), using default.")
+                print(f"[INFO /lucid] Using temperature: {used_temperature}")
 
-                # Process seed (use value from frontend if valid, otherwise default to None)
-                used_seed = None # Default: OpenAI handles randomness
+                used_seed = None
                 if seed_from_frontend is not None:
-                    try: used_seed = int(seed_from_frontend)
-                    except (ValueError, TypeError): print(f"[WARN /lucid] Invalid seed format ('{seed_from_frontend}'), using default (None).") # Vercel Log
-                print(f"[INFO /lucid] Using seed: {used_seed}") # Vercel Log
+                    try:
+                        used_seed = int(seed_from_frontend)
+                    except (ValueError, TypeError):
+                        print(f"[WARN /lucid] Invalid seed format ('{seed_from_frontend}'), using default (None).")
+                print(f"[INFO /lucid] Using seed: {used_seed}")
 
-                # --- Step 4: Call OpenAI API ---
-                # openai_url = 'https://api.openai.com/v1/chat/completions'
-                # headers = {
-                    # 'Content-Type': 'application/json',
-                    # 'Authorization': f'Bearer {openai_api_key}' # Use API key for authorization
-                # }
-                # EDITED: changed to openrouter headers and URL
+                # --- Step 4: Call OpenRouter API ---
                 openrouter_url = 'https://openrouter.ai/v1/chat/completions'
                 headers = {
                     'Content-Type': 'application/json',
                     'Authorization': f'Bearer {openrouter_api_key}',
-                    # Strongly recommended by OpenRouter
                     'HTTP-Referer': 'https://yourinstitution.edu',
                     'X-Title': 'LUCID Qualtrics Study'
                 }
-                
-                # Construct payload for OpenAI
                 data_payload = {
                     'model': model,
                     'messages': messages,
                     'temperature': used_temperature
                 }
-                # Only include seed if one was provided and valid
                 if used_seed is not None:
                     data_payload['seed'] = used_seed
 
-                print(f"[INFO /lucid] Calling OpenAI API (model: {model}). Payload keys: {list(data_payload.keys())}") # Vercel Log
+                print(f"[INFO /lucid] Calling OpenRouter API (model: {model}). Payload keys: {list(data_payload.keys())}")
 
-                # Make the POST request to OpenAI with a timeout
-                # response_openai = requests.post(openai_url, headers=headers, json=data_payload, timeout=30)
-                # openai_status = response_openai.status_code
-                # openai_response_text = response_openai.text # Get raw text for potential error logging
-                # print(f"[INFO /lucid] OpenAI response status: {openai_status}") # Vercel Log
-                # EDITED: Changed the request to fit openrouter
-                response_llm = requests.post(
-                                            openrouter_url,
-                                            headers=headers,
-                                            json=data_payload,
-                                            timeout=30
-                                            )
+                response_llm = requests.post(openrouter_url, headers=headers, json=data_payload, timeout=30)
 
-                
-                # --- Step 5: Process OpenAI Response ---
-                # if openai_status == 200:
-                # EDITED:
                 status = response_llm.status_code
                 response_text = response_llm.text
-                
-                if status == 200:
-                    # Successful call
-                    print("[INFO /lucid] Successfully processed OpenAI response.") # Vercel Log
-                    try:
-                        # Parse the JSON response from OpenAI
-                        resp_json = response_llm.json()
-                        # Extract the generated text content safely
-                        generated_text = resp_json['choices'][0]['message']['content']
 
-                        # Prepare the successful response data for Qualtrics frontend
+                if status == 200:
+                    try:
+                        resp_json = response_llm.json()
+                        generated_text = resp_json['choices'][0]['message']['content']
                         response_data = {
                             'generated_text': generated_text,
-                            'used_temperature': used_temperature # Echo back parameters used
+                            'used_temperature': used_temperature
                         }
                         if used_seed is not None:
-                            response_data['used_seed'] = used_seed # Echo back seed if used
-
-                        status_code = 200 # OK
+                            response_data['used_seed'] = used_seed
+                        status_code = 200
+                        print("[INFO /lucid] Successfully processed OpenRouter response.")
                     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as e:
-                        # Handle cases where OpenAI gives 200 but response format is unexpected
-                        # print(f"[ERROR /lucid] OpenAI response format unexpected (Status 200): {openai_response_text} - Error: {e}") # Vercel Log
-                        print(f"[ERROR /lucid] OpenRouter API Error ({status}): {response_text}")
+                        print(f"[ERROR /lucid] OpenRouter response format error: {e}")
                         response_data = {'error': 'Internal Server Error', 'message': 'Invalid response format from AI service.'}
                         status_code = 500
                 else:
-                    # Handle error responses from OpenAI (non-200 status)
-                    print(f"[ERROR DIAGNOSTIC /lucid] OpenAI API Error ({status}): {response_text}") # Vercel Log
-                    # Try to extract a cleaner error message from OpenAI's response JSON
-                    error_details = openai_response_text
+                    print(f"[ERROR /lucid] OpenRouter API Error ({status}): {response_text}")
+                    error_details = response_text
                     try:
-                       error_json = response_llm.json()
-                       if 'error' in error_json and 'message' in error_json['error']:
-                           error_details = error_json['error']['message']
+                        error_json = response_llm.json()
+                        if 'error' in error_json and 'message' in error_json['error']:
+                            error_details = error_json['error']['message']
                     except json.JSONDecodeError:
-                        pass # Use raw text if parsing fails
+                        pass
                     response_data = {'error': f'AI Service Error ({status})', 'message': error_details}
-                    # Use OpenAI's status code if it's a standard error, otherwise default to 500
                     status_code = status if status < 600 else 500
 
-    # --- Step 6: Handle Exceptions during Request Processing ---
     except requests.exceptions.Timeout:
-        print("[ERROR /lucid] Request to OpenAI timed out.") # Vercel Log
+        print("[ERROR /lucid] Request to OpenRouter timed out.")
         response_data = {'error': 'Gateway Timeout', 'message': 'Request to AI service timed out.'}
-        status_code = 504 # Gateway Timeout
+        status_code = 504
     except requests.exceptions.RequestException as e:
-        # Handle network errors connecting to OpenAI
-        print(f"[ERROR /lucid] Network error connecting to OpenAI: {e}") # Vercel Log
+        print(f"[ERROR /lucid] Network error connecting to OpenRouter: {e}")
         response_data = {'error': 'Service Unavailable', 'message': 'Network error connecting to AI service.'}
-        status_code = 503 # Service Unavailable
+        status_code = 503
     except json.JSONDecodeError:
-        # Handle invalid JSON sent from the frontend
-        print(f"[ERROR /lucid] Invalid JSON received from client.") # Vercel Log
+        print("[ERROR /lucid] Invalid JSON received from client.")
         response_data = {'error': 'Bad Request', 'message': 'Invalid JSON format in request body.'}
-        status_code = 400 # Bad Request
+        status_code = 400
     except Exception as e:
-        # Catch-all for any other unexpected errors
-        print(f"[ERROR /lucid] Unexpected server error: {e.__class__.__name__}: {e}") # Vercel Log
-        # Consider logging the full traceback here if possible in production
         import traceback
-        traceback.print_exc() # Print traceback to logs
-        response_data = {'error': 'Internal Server Error', 'message': f'An unexpected error occurred processing the request.'}
+        traceback.print_exc()
+        print(f"[ERROR /lucid] Unexpected server error: {e.__class__.__name__}: {e}")
+        response_data = {'error': 'Internal Server Error', 'message': 'An unexpected error occurred processing the request.'}
         status_code = 500
 
-    # --- Step 7: Create and Return Final Flask Response ---
+    # --- Step 5: Return final response ---
     final_response = make_response(jsonify(response_data), status_code)
-
-    # Add required CORS headers to the actual response
     final_response.headers['Access-Control-Allow-Origin'] = origin_to_send
-    final_response.headers['Vary'] = 'Origin' # Important for caching proxies
-
-    # UPDATED: Only add Access-Control-Allow-Credentials header if it should be 'true'
-    if allow_credentials_post: # This boolean reflects the decision made earlier
+    final_response.headers['Vary'] = 'Origin'
+    if allow_credentials_post:
         final_response.headers['Access-Control-Allow-Credentials'] = 'true'
-        print("[DEBUG POST /lucid] Adding Access-Control-Allow-Credentials: true to final response") # Vercel Log
+        print("[DEBUG POST /lucid] Adding Access-Control-Allow-Credentials: true to final response")
     else:
-        print("[DEBUG POST /lucid] Not adding Access-Control-Allow-Credentials header to final response") # Vercel Log
-
-
-    final_response.headers['Content-Type'] = 'application/json' # Ensure correct content type
-
-    print(f"[INFO /lucid] Responding with status code: {status_code}") # Vercel Log
+        print("[DEBUG POST /lucid] Not adding Access-Control-Allow-Credentials header to final response")
+    final_response.headers['Content-Type'] = 'application/json'
+    print(f"[INFO /lucid] Responding with status code: {status_code}")
     return final_response
 
 # --- Main Execution Block (for local development) ---

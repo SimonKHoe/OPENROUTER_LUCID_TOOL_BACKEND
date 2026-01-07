@@ -277,8 +277,8 @@ def lucid():
             # os.getenv('openai_api_key')     # legacy/local (lower snake case)
         # )
         openrouter_api_key = (
-            os.getenv('OPENROUTER_API_KEY') # or
-           # os.getenv('openrouter_api_key'
+            os.getenv('OPENROUTER_API_KEY') or
+            os.getenv('openrouter_api_key'
         )
 
         # Basic check/log for the API key (without exposing the key itself)

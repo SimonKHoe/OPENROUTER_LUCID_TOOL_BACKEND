@@ -271,23 +271,43 @@ def lucid():
 
         # --- Step 3: Get and Check for API Key ---
         # UPDATED: Check for both uppercase and lowercase env var names
-        openai_api_key = (
-            os.getenv('OPENAI_API_KEY') or  # Vercel / production (Screaming Snake Case)
-            os.getenv('openai_api_key')     # legacy/local (lower snake case)
-        )
+        # EDIT: Changed from the openai api key to openrouter
+        # openai_api_key = (
+            # os.getenv('OPENAI_API_KEY') or  # Vercel / production (Screaming Snake Case)
+            # os.getenv('openai_api_key')     # legacy/local (lower snake case)
+        # )
+        openrouter_api_key = (
+            os.getenv('OPENROUTER_API_KEY') or
+            os.getenv('openrouter_api_key)
 
         # Basic check/log for the API key (without exposing the key itself)
-        if isinstance(openai_api_key, str) and len(openai_api_key) > 7:
-            print(f"[DIAGNOSTIC /lucid] API Key Found (Length: {len(openai_api_key)}).") # Vercel Log
-        elif not openai_api_key:
-            print("[CRITICAL DIAGNOSTIC /lucid] Neither os.getenv('OPENAI_API_KEY') nor os.getenv('openai_api_key') returned a value!") # Vercel Log
+        # if isinstance(openrouter_api_key, str) and len(openrouter_api_key) > 7:
+            # print(f"[DIAGNOSTIC /lucid] API Key Found (Length: {len(openai_api_key)}).") # Vercel Log
+        # elif not openai_api_key:
+            # print("[CRITICAL DIAGNOSTIC /lucid] Neither os.getenv('OPENAI_API_KEY') nor os.getenv('openai_api_key') returned a value!") # Vercel Log
+                      
+        # EDITED: Changed the openai api key to openrouter instead
+            if isinstance(openrouter_api_key, str) and len(openrouter_api_key) > 7:
+                print(f"[DIAGNOSTIC /lucid] OpenRouter API Key Found (Length: {len(openrouter_api_key)}).")
+            elif not openrouter_api_key:
+                print("[CRITICAL /lucid] OPENROUTER_API_KEY not found in environment variables.") # Vercel log
 
+            
+                      
         # --- Check if API Key is actually present ---
-        if not openai_api_key:
-            print('[CRITICAL /lucid] OpenAI API key not found in environment variables (checked OPENAI_API_KEY and openai_api_key).') # Vercel Log
+        
+            # if not openai_api_key:
+            # print('[CRITICAL /lucid] OpenAI API key not found in environment variables (checked OPENAI_API_KEY and openai_api_key).') # Vercel Log
             # Set error response if key is missing
-            response_data = {'error': 'Configuration Error', 'message':'OpenAI API key not configured on server.'}
-            status_code = 500 # Indicate server configuration error
+            # response_data = {'error': 'Configuration Error', 'message':'OpenAI API key not configured on server.'}
+            # status_code = 500 # Indicate server configuration error
+        # EDITED: openrouter instead of openai    
+        if not openrouter_api_key:
+            response_data = {
+                'error': 'Configuration Error',
+                'message': 'OpenRouter API key not configured on server.'
+            }
+            status_code = 500
         else:
             # API Key found, proceed to extract data and call OpenAI
 
@@ -321,11 +341,21 @@ def lucid():
                 print(f"[INFO /lucid] Using seed: {used_seed}") # Vercel Log
 
                 # --- Step 4: Call OpenAI API ---
-                openai_url = 'https://api.openai.com/v1/chat/completions'
+                # openai_url = 'https://api.openai.com/v1/chat/completions'
+                # headers = {
+                    # 'Content-Type': 'application/json',
+                    # 'Authorization': f'Bearer {openai_api_key}' # Use API key for authorization
+                # }
+                # EDITED: changed to openrouter headers and URL
+                openrouter_url = 'https://openrouter.ai/v1/chat/completions'
                 headers = {
                     'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {openai_api_key}' # Use API key for authorization
+                    'Authorization': f'Bearer {openrouter_api_key}',
+                    # Strongly recommended by OpenRouter
+                    'HTTP-Referer': 'https://yourinstitution.edu',
+                    'X-Title': 'LUCID Qualtrics Study'
                 }
+                
                 # Construct payload for OpenAI
                 data_payload = {
                     'model': model,
@@ -339,11 +369,19 @@ def lucid():
                 print(f"[INFO /lucid] Calling OpenAI API (model: {model}). Payload keys: {list(data_payload.keys())}") # Vercel Log
 
                 # Make the POST request to OpenAI with a timeout
-                response_openai = requests.post(openai_url, headers=headers, json=data_payload, timeout=30)
-                openai_status = response_openai.status_code
-                openai_response_text = response_openai.text # Get raw text for potential error logging
-                print(f"[INFO /lucid] OpenAI response status: {openai_status}") # Vercel Log
+                # response_openai = requests.post(openai_url, headers=headers, json=data_payload, timeout=30)
+                # openai_status = response_openai.status_code
+                # openai_response_text = response_openai.text # Get raw text for potential error logging
+                # print(f"[INFO /lucid] OpenAI response status: {openai_status}") # Vercel Log
+                # EDITED: Changed the request to fit openrouter
+                response_llm = requests.post(
+                                            openrouter_url,
+                                            headers=headers,
+                                            json=data_payload,
+                                            timeout=30
+                                            )
 
+                
                 # --- Step 5: Process OpenAI Response ---
                 if openai_status == 200:
                     # Successful call
@@ -365,7 +403,8 @@ def lucid():
                         status_code = 200 # OK
                     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as e:
                         # Handle cases where OpenAI gives 200 but response format is unexpected
-                        print(f"[ERROR /lucid] OpenAI response format unexpected (Status 200): {openai_response_text} - Error: {e}") # Vercel Log
+                        # print(f"[ERROR /lucid] OpenAI response format unexpected (Status 200): {openai_response_text} - Error: {e}") # Vercel Log
+                        print(f"[ERROR /lucid] OpenRouter API Error ({status}): {response_text}")
                         response_data = {'error': 'Internal Server Error', 'message': 'Invalid response format from AI service.'}
                         status_code = 500
                 else:

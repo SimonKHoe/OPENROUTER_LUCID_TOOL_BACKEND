@@ -322,7 +322,7 @@ def lucid():
             seed_from_frontend = body.get('seed') # Get optional seed
 
             # Validate messages list (must not be empty)
-            if not messages or not isinstance(messages, list):
+            if not messages or not (messages, list):
                 print("[WARN /lucid] Invalid or empty 'messages' list received.") # Vercel Log
                 response_data = {'error': 'Bad Request', 'message': 'Messages list is missing, empty, or invalid.'}
                 status_code = 400 # Bad Request
@@ -388,6 +388,7 @@ def lucid():
                 
                 # --- Step 5: Process OpenAI Response ---
                 # if openai_status == 200:
+                # EDITED:
                 status = response_llm.status_code
                 response_text = response_llm.text
                 
@@ -417,7 +418,7 @@ def lucid():
                         status_code = 500
                 else:
                     # Handle error responses from OpenAI (non-200 status)
-                    print(f"[ERROR DIAGNOSTIC /lucid] OpenAI API Error ({openai_status}): {openai_response_text}") # Vercel Log
+                    print(f"[ERROR DIAGNOSTIC /lucid] OpenAI API Error ({status}): {response_text}") # Vercel Log
                     # Try to extract a cleaner error message from OpenAI's response JSON
                     error_details = openai_response_text
                     try:
@@ -426,9 +427,9 @@ def lucid():
                            error_details = error_json['error']['message']
                     except json.JSONDecodeError:
                         pass # Use raw text if parsing fails
-                    response_data = {'error': f'AI Service Error ({openai_status})', 'message': error_details}
+                    response_data = {'error': f'AI Service Error ({status})', 'message': error_details}
                     # Use OpenAI's status code if it's a standard error, otherwise default to 500
-                    status_code = openai_status if openai_status < 600 else 500
+                    status_code = status if status < 600 else 500
 
     # --- Step 6: Handle Exceptions during Request Processing ---
     except requests.exceptions.Timeout:

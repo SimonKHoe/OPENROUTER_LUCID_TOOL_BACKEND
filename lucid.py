@@ -278,7 +278,7 @@ def lucid():
         # )
         openrouter_api_key = (
             os.getenv('OPENROUTER_API_KEY') or
-            os.getenv('openrouter_api_key)
+            os.getenv('openrouter_api_key')
 
         # Basic check/log for the API key (without exposing the key itself)
         # if isinstance(openrouter_api_key, str) and len(openrouter_api_key) > 7:
@@ -383,7 +383,11 @@ def lucid():
 
                 
                 # --- Step 5: Process OpenAI Response ---
-                if openai_status == 200:
+                # if openai_status == 200:
+                status = response_llm.status_code
+                response_text = response_llm.text
+                
+                if status == 200:
                     # Successful call
                     print("[INFO /lucid] Successfully processed OpenAI response.") # Vercel Log
                     try:

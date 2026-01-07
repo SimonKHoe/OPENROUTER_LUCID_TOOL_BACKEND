@@ -220,6 +220,9 @@ def lucid():
     # --- Step 1: CORS Check for POST request ---
     origin = request.headers.get('Origin')
     allowed_origins = get_allowed_origins_config()
+    # ---------------- DEBUG LOGGING ----------------
+    print(f"[DEBUG /lucid] OPENROUTER_API_KEY length: {len(os.getenv('OPENROUTER_API_KEY') or '')}")
+    # ------------------------------------------------
     print(f"[DEBUG POST /lucid] Request Origin: '{origin}' vs Allowed: {allowed_origins}") # Vercel Log
 
     origin_to_send = None # Header value for Access-Control-Allow-Origin
